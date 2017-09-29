@@ -11,18 +11,15 @@ using Sitecore.Globalization;
 using Sitecore.Layouts;
 using Sitecore.Shell.Applications.WebEdit.Commands;
 using Sitecore.Shell.Framework.Commands;
-using Sitecore.Web;
 using Sitecore.Web.UI.Sheer;
 using Sitecore.WFFM.Abstractions.Dependencies;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
-using System.Web;
-using System.Web.UI;
 using System.Xml;
 
-namespace Sitecore.Forms.Core.Commands
+namespace Sitecore.Support.Forms.Core.Commands
 {
     [Serializable]
     public class EditForm : Command
@@ -100,7 +97,8 @@ namespace Sitecore.Forms.Core.Commands
                 bool flag = false;
                 if (args.Parameters["checksave"] != "0")
                 {
-                    FormItem form = FormItem.GetForm(args.Parameters["formId"]);
+                    //FormItem form = FormItem.GetForm(args.Parameters["formId"]);
+                    FormItem form = this.GetFormItem(args);
                     IEnumerable<PageEditorField> modifiedFields = this.GetModifiedFields(form);
                     if (modifiedFields.Count<PageEditorField>() > 0)
                     {
@@ -122,7 +120,8 @@ namespace Sitecore.Forms.Core.Commands
             Assert.ArgumentNotNull(args, "args");
             if (!args.IsPostBack)
             {
-                FormItem form = FormItem.GetForm(args.Parameters["formId"]);
+                //FormItem form = FormItem.GetForm(args.Parameters["formId"]);
+                FormItem form = this.GetFormItem(args);
                 if (form == null)
                 {
                     return;
@@ -167,7 +166,8 @@ namespace Sitecore.Forms.Core.Commands
                     text2 = iD.ToShortID().ToString();
                 }
                 SheerResponse.Eval("window.parent.Sitecore.PageModes.ChromeManager.fieldValuesContainer.children().each(function(e){ if( window.parent.$sc('#form_" + text2.ToUpper() + "').find('#' + this.id + '_edit').size() > 0 ) { window.parent.$sc(this).remove() }});");
-                SheerResponse.Eval("window.parent.Sitecore.PageModes.ChromeManager.handleMessage('chrome:rendering:propertiescompleted', {controlId : '" + text + "'});");
+                //SheerResponse.Eval("window.parent.Sitecore.PageModes.ChromeManager.handleMessage('chrome:rendering:propertiescompleted', {controlId : '" + text + "'});");
+                SheerResponse.Eval("window.parent.location.reload();");
             }
         }
 
@@ -258,7 +258,7 @@ namespace Sitecore.Forms.Core.Commands
                 IEnumerable<PageEditorField> fields = this.GetFields(Context.ClientPage.Request.Form);
                 foreach (PageEditorField current in fields)
                 {
-                    Item item = StaticSettings.ContextDatabase.GetItem(current.ItemID);
+                    Item item = StaticSettings.ContextDatabase.GetItem(current.ItemID, form.Language);
                     if (form.GetField(current.ItemID) != null || item.ID == form.ID)
                     {
                         string text = item[current.FieldID];
@@ -278,11 +278,28 @@ namespace Sitecore.Forms.Core.Commands
             IEnumerable<PageEditorField> modifiedFields = this.GetModifiedFields(form);
             foreach (PageEditorField current in modifiedFields)
             {
-                Item item = StaticSettings.ContextDatabase.GetItem(current.ItemID);
+                Item item = StaticSettings.ContextDatabase.GetItem(current.ItemID, form.Language);
                 item.Editing.BeginEdit();
                 item[current.FieldID] = current.Value;
                 item.Editing.EndEdit();
             }
+        }
+
+        private FormItem GetFormItem(ClientPipelineArgs args)
+        {
+            FormItem formItem = null;
+            Language language;
+            string formId = args.Parameters["formId"];
+            string contentLanguage = args.Parameters["contentlanguage"];
+            if (!string.IsNullOrEmpty(contentLanguage) && Language.TryParse(contentLanguage, out language) && !string.IsNullOrEmpty(formId))
+            {
+                formItem = new FormItem(StaticSettings.ContextDatabase.GetItem(formId, language));
+            }
+            if (formItem == null)
+            {
+                formItem = FormItem.GetForm(formId);
+            }
+            return formItem;
         }
     }
 }
